@@ -1,4 +1,5 @@
--- <script library>true</script library>
+-- <export location>Script Libraries Folder</export location>
+-- <export format>Compiled Script</export format>
 --OB Categories
 --	Created by: Nicholas Parsons
 --	Created on: 5/10/20, v2 on 18 July 2021
@@ -11,11 +12,11 @@ use scripting additions
 use script "SQLite Lib2"
 use script "Myriad Tables Lib"
 use OBUtility : script "OB Utilities"
-use OBData : script "OB Data"
+use OBData : script "OB Data" version "1.3"
 
 property name : "OB Categories v2"
 property id : "com.OpenBooksApp.OBCategories"
-property version : "2.0"
+property version : "2.1" -- 1 July 2023
 property primaryBaseForAccountCategoryIDs : 10000000
 property categoryMod : 100
 
@@ -359,7 +360,7 @@ on promptUserForNewCategoryName for thisTableName as text : "accounts" given db:
 	return {accountName:itsName, accountID:itsNewPK}
 end promptUserForNewCategoryName
 
-on addCategory to thisDB for thisTableName as text : "accounts" given parentCategoryID:parentCategoryID, itsName:itsName as text, forcedUniqueness:forcedUniqueness as boolean : true, accountHidden:accountHidden as boolean : false
+on addCategory to thisDB for thisTableName as text : "accounts" given parentCategoryID:parentCategoryID, itsName:itsName as text, forcedUniqueness:forcedUniqueness as boolean : true, accountHidden:accountHidden as boolean : false, separateTransaction:separateTransaction : true
 	doOBLog of OBUtility for "adding a new category called " & itsName & " to the " & thisTableName & " table with a parent category ID of " & parentCategoryID given logType:"debug"
 	-- test to see if itsName is unique 
 	if forcedUniqueness then
@@ -373,9 +374,9 @@ on addCategory to thisDB for thisTableName as text : "accounts" given parentCate
 	-- we don't need to escape the string here because the insertRecord handler already escapes it
 	set itsPK to newPK for thisDB given parentCategoryID:parentCategoryID, tableName:thisTableName
 	if accountHidden then
-		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID, accountHidden} to thisTableName given db:thisDB, columns:"ID, name, parent, hidden"
+		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID, accountHidden} to thisTableName given db:thisDB, columns:"ID, name, parent, hidden", separateTransaction:separateTransaction
 	else
-		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID} to thisTableName given db:thisDB, columns:"ID, name, parent"
+		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID} to thisTableName given db:thisDB, columns:"ID, name, parent", separateTransaction:separateTransaction
 	end if
 	return itsPK
 end addCategory
