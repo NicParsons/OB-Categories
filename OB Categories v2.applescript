@@ -12,11 +12,11 @@ use scripting additions
 use script "SQLite Lib2"
 use script "Myriad Tables Lib"
 use OBUtility : script "OB Utilities"
-use OBData : script "OB Data" version "1.3"
+use OBData : script "OB Data" version "1.5"
 
 property name : "OB Categories v2"
 property id : "com.OpenBooksApp.OBCategories"
-property version : "2.1" -- 1 July 2023
+property version : "2.3" -- 4 July 2023
 property primaryBaseForAccountCategoryIDs : 10000000
 property categoryMod : 100
 
@@ -187,17 +187,17 @@ if it does have child categories, then display those
 	return functionResult
 end chooseParentCategory
 
-on makeCategoriesTable for thisDB given tableName:tableName as text : "accounts"
+on makeCategoriesTable for thisDB given tableName:tableName as text : "accounts", beginningNewTransaction:beginningNewTransaction as boolean : false, updatingVersionTable:updatingVersionTable as boolean
 	doOBLog of OBUtility for "making new table for " & tableName given logType:"debug"
-	tell OBData to makeTable(thisDB, tableName, "id integer primary key not null, name text not null, parent integer references " & tableName & "(ID), hidden integer not null default 0")
+	tell OBData to makeNewTable for thisDB given tableName:tableName, columnString:"id integer primary key not null, name text not null, parent integer references " & tableName & "(ID), hidden integer not null default 0", beginningNewTransaction:beginningNewTransaction, updatingVersionTable:updatingVersionTable
 end makeCategoriesTable
 
-on listAllCategoryNames from thisTableName : "accounts" given db:thisDB, tableFormatting:tableFormatting as boolean : false, hiddenAccounts:hiddenAccounts as boolean : true
+on listAllCategoryNames from thisTablename : "accounts" given db:thisDB, tableFormatting:tableFormatting as boolean : false, hiddenAccounts:hiddenAccounts as boolean : true
 	doOBLog of OBUtility for "getting list of all category names" given logType:"debug"
 	if hiddenAccounts then
-		set theNames to query db thisDB sql string "select distinct name from " & thisTableName & " order by name asc"
+		set theNames to query db thisDB sql string "select distinct name from " & thisTablename & " order by name asc"
 	else
-		set theNames to query db thisDB sql string "select distinct name from " & thisTableName & " where hidden = 0 order by name asc"
+		set theNames to query db thisDB sql string "select distinct name from " & thisTablename & " where hidden = 0 order by name asc"
 	end if
 	-- that will have returned a list of lists
 	-- so theNames will be a list containing 0 or more lists each of which will contain one string item being the name
@@ -275,7 +275,7 @@ on getParentAccounts from thisDB given tableName:tableName as text : "accounts",
 	return theData
 end getParentAccounts
 
-on listChildCategoryNames from thisTableName : "accounts" given db:thisDB, tableFormatting:tableFormatting as boolean : false, sortMethod:sortString as string : "name asc", parentCategoryID:parentCategoryID as integer : missing value, hiddenAccounts:hiddenAccounts as boolean : true
+on listChildCategoryNames from thisTablename : "accounts" given db:thisDB, tableFormatting:tableFormatting as boolean : false, sortMethod:sortString as string : "name asc", parentCategoryID:parentCategoryID as integer : missing value, hiddenAccounts:hiddenAccounts as boolean : true
 	doOBLog of OBUtility for "getting list of names of all categories that do not have children" given logType:"debug"
 	if hiddenAccounts then
 		set hiddenAccountCondition to ""
@@ -284,10 +284,10 @@ on listChildCategoryNames from thisTableName : "accounts" given db:thisDB, table
 	end if
 	if parentCategoryID is missing value then
 		-- we want the name for each row where the id of that row does not appear at all in the parent column i.e. does not appear in any row in the parent column
-		set theNames to query db thisDB sql string "select distinct name from " & thisTableName & " where ID not in (select parent from " & thisTableName & " where parent is not null)" & hiddenAccountCondition & " order by " & sortString
+		set theNames to query db thisDB sql string "select distinct name from " & thisTablename & " where ID not in (select parent from " & thisTablename & " where parent is not null)" & hiddenAccountCondition & " order by " & sortString
 	else -- we want the name for each row where its ID begins with the parentCategoryID and its id does not appear at all in the parent column
 		set parentCategoryID to item 1 of (removeTrailingZeros from parentCategoryID)
-		set theNames to query db thisDB sql string "select distinct name from " & thisTableName & " where cast(ID as string) like '" & (parentCategoryID as string) & "%' and ID not in (select parent from " & thisTableName & " where parent is not null)" & hiddenAccountCondition & " order by " & sortString
+		set theNames to query db thisDB sql string "select distinct name from " & thisTablename & " where cast(ID as string) like '" & (parentCategoryID as string) & "%' and ID not in (select parent from " & thisTablename & " where parent is not null)" & hiddenAccountCondition & " order by " & sortString
 	end if
 	if theNames is {} then
 		doOBLog of OBUtility for "no child account/categories found" given logType:"debug"
@@ -314,12 +314,12 @@ on listDescendantCategoryIDs of thisParentID given db:thisDB, tableName:tableNam
 	return theList
 end listDescendantCategoryIDs
 
-on listParentIDs from thisTableName given db:thisDB, hiddenAccounts:hiddenAccounts as boolean : true
-	doOBLog of OBUtility for "getting list of all the IDs from the parent column of the " & thisTableName & " table" given logType:"debug"
+on listParentIDs from thisTablename given db:thisDB, hiddenAccounts:hiddenAccounts as boolean : true
+	doOBLog of OBUtility for "getting list of all the IDs from the parent column of the " & thisTablename & " table" given logType:"debug"
 	if hiddenAccounts then
-		set theIDs to query db thisDB sql string "select distinct parent from " & thisTableName & " order by parent desc"
+		set theIDs to query db thisDB sql string "select distinct parent from " & thisTablename & " order by parent desc"
 	else
-		set theIDs to query db thisDB sql string "select distinct parent from " & thisTableName & " where hidden = 0 order by parent desc"
+		set theIDs to query db thisDB sql string "select distinct parent from " & thisTablename & " where hidden = 0 order by parent desc"
 	end if
 	if theIDs is not {} then set theIDs to extract column 1 from theIDs
 	return theIDs
@@ -347,24 +347,24 @@ on addNewCategory to thisDB given tableName:tableName as text, initialPosition:i
 	return functionResult
 end addNewCategory
 
-on promptUserForNewCategoryName for thisTableName as text : "accounts" given db:thisDB, parentCategoryID:parentCategoryID
+on promptUserForNewCategoryName for thisTablename as text : "accounts" given db:thisDB, parentCategoryID:parentCategoryID
 	try
-		doOBLog of OBUtility for "prompting user to add a new category to " & thisTableName & " where the parent category ID is " & parentCategoryID given logType:"debug"
+		doOBLog of OBUtility for "prompting user to add a new category to " & thisTablename & " where the parent category ID is " & parentCategoryID given logType:"debug"
 		set theResult to returnOBValue of OBUtility without backButton given prompt:"Enter the new category name.", title:"New Category"
 		if userCancelled of theResult then return missing value
 		set itsName to valueReturned of theResult
-		set itsNewPK to addCategory to thisDB for thisTableName given parentCategoryID:parentCategoryID, itsName:itsName
+		set itsNewPK to addCategory to thisDB for thisTablename given parentCategoryID:parentCategoryID, itsName:itsName
 	on error errorMessage number errorNumber
 		error errorMessage & " (thrown in the promptUserForNewCategoryName handler of OB Categories v2)" number errorNumber
 	end try
 	return {accountName:itsName, accountID:itsNewPK}
 end promptUserForNewCategoryName
 
-on addCategory to thisDB for thisTableName as text : "accounts" given parentCategoryID:parentCategoryID, itsName:itsName as text, forcedUniqueness:forcedUniqueness as boolean : true, accountHidden:accountHidden as boolean : false, separateTransaction:separateTransaction : true
-	doOBLog of OBUtility for "adding a new category called " & itsName & " to the " & thisTableName & " table with a parent category ID of " & parentCategoryID given logType:"debug"
+on addCategory to thisDB for thisTablename as text : "accounts" given parentCategoryID:parentCategoryID, itsName:itsName as text, forcedUniqueness:forcedUniqueness as boolean : true, accountHidden:accountHidden as boolean : false, separateTransaction:separateTransaction : true
+	doOBLog of OBUtility for "adding a new category called " & itsName & " to the " & thisTablename & " table with a parent category ID of " & parentCategoryID given logType:"debug"
 	-- test to see if itsName is unique 
 	if forcedUniqueness then
-		set itsUnique to nameIsUnique for thisDB given nameToTest:itsName, tableName:thisTableName
+		set itsUnique to nameIsUnique for thisDB given nameToTest:itsName, tableName:thisTablename
 		if itsUnique then
 			doOBLog of OBUtility for "the name is unique" given logType:"debug"
 		else
@@ -372,37 +372,37 @@ on addCategory to thisDB for thisTableName as text : "accounts" given parentCate
 		end if -- it's unique
 	end if -- forcedUniqueness
 	-- we don't need to escape the string here because the insertRecord handler already escapes it
-	set itsPK to newPK for thisDB given parentCategoryID:parentCategoryID, tableName:thisTableName
+	set itsPK to newPK for thisDB given parentCategoryID:parentCategoryID, tableName:thisTablename
 	if accountHidden then
-		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID, accountHidden} to thisTableName given db:thisDB, columns:"ID, name, parent, hidden", separateTransaction:separateTransaction
+		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID, accountHidden} to thisTablename given db:thisDB, columns:"ID, name, parent, hidden", separateTransaction:separateTransaction
 	else
-		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID} to thisTableName given db:thisDB, columns:"ID, name, parent", separateTransaction:separateTransaction
+		tell OBData to insertRecord for {itsPK, itsName, parentCategoryID} to thisTablename given db:thisDB, columns:"ID, name, parent", separateTransaction:separateTransaction
 	end if
 	return itsPK
 end addCategory
 
-on deleteCategory for thisAccountID from thisDB given tableName:thisTableName as text : "accounts"
+on deleteCategory for thisAccountID from thisDB given tableName:thisTablename as text : "accounts"
 	try
-		doOBLog of OBUtility for "deleting account " & thisAccountID & " from " & thisTableName given logType:"debug"
-		tell OBData to deleteRow from thisTableName given db:thisDB, PKName:"ID", PKID:thisAccountID
+		doOBLog of OBUtility for "deleting account " & thisAccountID & " from " & thisTablename given logType:"debug"
+		tell OBData to deleteRow from thisTablename given db:thisDB, PKName:"ID", PKID:thisAccountID
 	on error errorMessage number errorNumber
 		error errorMessage & " (thrown in the deleteCategory handler of OB Categories)" number errorNumber
 	end try
 end deleteCategory
 
-on changeCategoryName of thisAccountID to newCategoryName as text given db:thisDB, tableName:thisTableName as text : "accounts", forcedUniqueness:forcedUniqueness as boolean : true
+on changeCategoryName of thisAccountID to newCategoryName as text given db:thisDB, tableName:thisTablename as text : "accounts", forcedUniqueness:forcedUniqueness as boolean : true
 	try
 		doOBLog of OBUtility for "changing the name of account " & thisAccountID & " to " & newCategoryName given logType:"debug"
 		-- test to see if itsName is unique 
 		if forcedUniqueness then
-			set itsUnique to nameIsUnique for thisDB given nameToTest:newCategoryName, tableName:thisTableName
+			set itsUnique to nameIsUnique for thisDB given nameToTest:newCategoryName, tableName:thisTablename
 			if itsUnique then
 				doOBLog of OBUtility for "the name is unique" given logType:"debug"
 			else
 				error "There is already an account/category with the name “" & newCategoryName & "”." number 1000
 			end if -- it's unique
 		end if -- forcedUniqueness
-		tell OBData to updateTable for thisDB given tableName:thisTableName, PKName:"ID", PKID:thisAccountID, fieldName:"name", newValue:newCategoryName
+		tell OBData to updateTable for thisDB given tableName:thisTablename, PKName:"ID", PKID:thisAccountID, fieldName:"name", newValue:newCategoryName
 	on error errorMessage number errorNumber
 		error errorMessage & " (thrown in the changeCategoryName handler of OB Categories v2)" number errorNumber
 	end try
